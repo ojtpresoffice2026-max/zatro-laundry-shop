@@ -156,6 +156,9 @@ export default function LaundryOrders() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [creationNotice, setCreationNotice] = useState<OrderCreationNotice | null>(null);
+  const [printingCreatedReceipt, setPrintingCreatedReceipt] = useState(false);
+
+  const isAlreadyPickedUpNotice = /has already been picked up\.$/i.test(error);
 
   // Automatically dismiss centered system notifications.
   useEffect(() => {
@@ -193,16 +196,8 @@ export default function LaundryOrders() {
 
   const [instructions, setInstructions] = useState("");
 
-  // Automatically close the order-created confirmation after 4 seconds.
-  useEffect(() => {
-    if (!creationNotice) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setCreationNotice(null);
-    }, 15000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [creationNotice]);
+  // Keep the order-created panel open until the admin closes it so there is
+  // enough time to review the order and print its receipt.
 
   // =====================================================
   // LOAD DATA
@@ -601,7 +596,7 @@ export default function LaundryOrders() {
 
   const openPickup = (order: Order) => {
     if (order.status === "completed") {
-      setError("This order has already been picked up.");
+      setError(`${order.order_number} has already been picked up.`);
       return;
     }
     setPickupOrder(order);
@@ -745,28 +740,29 @@ export default function LaundryOrders() {
     setError("");
   };
 
-  // Print a compact receipt only, without printing the dashboard or modal.
-  const printOrderReceipt = () => {
-    if (!selectedOrder) return;
-
-    const qrSvg = document.querySelector(".print-order-qr svg")?.outerHTML ?? "";
+  // Print the existing receipt layout inside a hidden iframe.
+  // The same receipt is used by both the order-details view and the
+  // order-created confirmation panel. No separate about:blank tab is opened.
+  const printReceipt = async (
+    receiptOrder: Pick<Order, "order_number" | "customer_name" | "created_at" | "total_amount">,
+    receiptItems: OrderItem[],
+    qrSvg: string,
+  ) => {
     if (!qrSvg) {
-      setError("The order QR code is not ready. Close and reopen the order details, then try again.");
-      return;
-    }
-
-    const popup = window.open("", "_blank", "width=420,height=720");
-    if (!popup) {
-      setError("The print window was blocked. Allow pop-ups for localhost and try again.");
+      setError("The order QR code is not ready. Please close and reopen the panel, then try again.");
       return;
     }
 
     const escapeHtml = (value: string) =>
       value.replace(/[&<>"']/g, (char) => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
       })[char] ?? char);
 
-    const itemRows = orderItems.map((item) => `
+    const itemRows = receiptItems.map((item) => `
       <div class="item">
         <div class="item-name">
           <strong>${escapeHtml(item.service_name)}</strong>
@@ -776,47 +772,136 @@ export default function LaundryOrders() {
       </div>
     `).join("");
 
-    const pickupText = selectedOrder.completed_at
-      ? format(new Date(selectedOrder.completed_at), "MMM dd, yyyy hh:mm a")
-      : "Not picked up yet";
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("title", "ZATRO receipt print preview");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.visibility = "hidden";
 
-    popup.document.open();
-    popup.document.write(`<!doctype html>
-      <html>
+    document.body.appendChild(iframe);
+
+    const printDocument = iframe.contentDocument;
+    const printWindow = iframe.contentWindow;
+
+    if (!printDocument || !printWindow) {
+      iframe.remove();
+      setError("Unable to prepare the receipt for printing. Please try again.");
+      return;
+    }
+
+    const cleanup = () => {
+      window.clearTimeout(cleanupTimeout);
+      iframe.remove();
+    };
+
+    const cleanupTimeout = window.setTimeout(cleanup, 60000);
+
+    printWindow.addEventListener("afterprint", cleanup, { once: true });
+
+    printDocument.open();
+    printDocument.write(`<!doctype html>
+      <html lang="en">
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>ZATRO Receipt ${escapeHtml(selectedOrder.order_number)}</title>
+          <base href="${window.location.origin}/">
+          <title>ZATRO Receipt ${escapeHtml(receiptOrder.order_number)}</title>
           <style>
             @page { size: 80mm 250mm; margin: 0; }
             * { box-sizing: border-box; }
             html, body {
-              width: 80mm; margin: 0; padding: 0; background: #fff; color: #111;
+              width: 80mm;
+              margin: 0;
+              padding: 0;
+              background: #fff;
+              color: #111;
               font-family: Arial, Helvetica, sans-serif;
-              -webkit-print-color-adjust: exact; print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
             }
             body { padding: 4mm; }
             .receipt { width: 72mm; margin: 0 auto; }
-            .brand { text-align: center; font-size: 15pt; font-weight: 800; letter-spacing: 1px; margin: 0 0 1mm; }
-            .subtitle { text-align: center; font-size: 8pt; margin: 0 0 3mm; color: #444; }
+            .brand {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              text-align: center;
+              font-size: 15pt;
+              font-weight: 800;
+              letter-spacing: 1px;
+              margin: 0 0 1mm;
+            }
+            .brand-logo {
+              display: block;
+              width: 22mm;
+              height: 22mm;
+              object-fit: contain;
+              margin: 0 auto 1mm;
+            }
+            .subtitle {
+              text-align: center;
+              font-size: 8pt;
+              margin: 0 0 3mm;
+              color: #444;
+            }
             .rule { border: 0; border-top: 1px dashed #777; margin: 3mm 0; }
-            .order-number { text-align: center; font-size: 10pt; font-weight: 700; margin: 0 0 3mm; }
-            .qr { width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; margin: 0 auto 3mm; }
-            .qr svg { display: block; width: 32mm; height: 32mm; margin: 0 auto 1.5mm; }
+            .order-number {
+              text-align: center;
+              font-size: 10pt;
+              font-weight: 700;
+              margin: 0 0 3mm;
+            }
+            .qr {
+              width: 100%;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              text-align: center;
+              margin: 0 auto 3mm;
+            }
+            .qr svg {
+              display: block;
+              width: 32mm;
+              height: 32mm;
+              margin: 0 auto 1.5mm;
+            }
             .qr small { font-size: 7pt; }
-            .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; font-size: 8pt; }
+            .meta {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 2mm;
+              font-size: 8pt;
+            }
             .meta p { margin: 0 0 1mm; overflow-wrap: anywhere; }
             .label { color: #555; font-size: 7pt; }
             .section-title { font-size: 9pt; font-weight: 700; margin: 3mm 0 2mm; }
-            .item { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; border-bottom: 1px solid #ddd; padding: 2mm 0; font-size: 8pt; }
+            .item {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              gap: 2mm;
+              border-bottom: 1px solid #ddd;
+              padding: 2mm 0;
+              font-size: 8pt;
+            }
             .item-name { min-width: 0; }
             .item-name strong { display: block; overflow-wrap: anywhere; }
             .item small { display: block; margin-top: 1mm; color: #555; font-size: 7pt; }
-            .total { display: flex; justify-content: space-between; border-top: 1px solid #111; margin-top: 3mm; padding-top: 3mm; font-size: 11pt; font-weight: 800; }
-            .footer { text-align: center; font-size: 7pt; color: #555; margin-top: 5mm; }
-            @media screen {
-              body { margin: 12px auto; box-shadow: 0 0 8px #999; }
+            .total {
+              display: flex;
+              justify-content: space-between;
+              border-top: 1px solid #111;
+              margin-top: 3mm;
+              padding-top: 3mm;
+              font-size: 11pt;
+              font-weight: 800;
             }
+            .footer { text-align: center; font-size: 7pt; color: #555; margin-top: 5mm; }
             @media print {
               html, body { width: 80mm !important; margin: 0 !important; padding: 0 !important; }
               .receipt { width: 72mm !important; margin: 0 auto !important; }
@@ -825,31 +910,102 @@ export default function LaundryOrders() {
         </head>
         <body>
           <main class="receipt">
-            <h1 class="brand">ZATRO</h1>
+            <div class="brand">
+              <img src="zatro.jpeg" alt="ZATRO Laundry Shop" class="brand-logo">
+              <div>ZATRO</div>
+            </div>
             <p class="subtitle">LAUNDRY SHOP</p>
             <hr class="rule">
-            <p class="order-number">${escapeHtml(selectedOrder.order_number)}</p>
+            <p class="order-number">${escapeHtml(receiptOrder.order_number)}</p>
             <div class="qr">${qrSvg}<small>Scan this code to identify this exact order</small></div>
             <hr class="rule">
             <div class="meta">
-              <div><p class="label">CUSTOMER</p><p><strong>${escapeHtml(selectedOrder.customer_name)}</strong></p></div>
-              <div><p class="label">ORDER DATE</p><p>${format(new Date(selectedOrder.created_at), "MMM dd, yyyy")}</p></div>
-              <div><p class="label">STATUS</p><p>${readableStatus(selectedOrder.status)}</p></div>
-              <div><p class="label">PICKUP</p><p>${pickupText}</p></div>
+              <div>
+                <p class="label">CUSTOMER</p>
+                <p><strong>${escapeHtml(receiptOrder.customer_name)}</strong></p>
+              </div>
+              <div>
+                <p class="label">ORDER DATE &amp; TIME</p>
+                <p>${format(new Date(receiptOrder.created_at), "MMM dd, yyyy hh:mm:ss a")}</p>
+              </div>
             </div>
             <p class="section-title">ORDER SERVICES</p>
             ${itemRows || "<p>No order items found.</p>"}
-            <div class="total"><span>TOTAL</span><span>${currency(selectedOrder.total_amount)}</span></div>
+            <div class="total">
+              <span>TOTAL</span>
+              <span>${currency(receiptOrder.total_amount)}</span>
+            </div>
             <p class="footer">Thank you for choosing ZATRO!</p>
           </main>
-          <script>
-            window.onload = () => setTimeout(() => { window.focus(); window.print(); }, 300);
-            window.onafterprint = () => window.close();
-          </script>
         </body>
       </html>`);
-    popup.document.close();
+    printDocument.close();
+
+    try {
+      // Wait for the receipt logo to finish loading before opening the print dialog.
+      const images = Array.from(printDocument.images);
+      await Promise.all(images.map((image) => {
+        if (image.complete) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          image.addEventListener("load", () => resolve(), { once: true });
+          image.addEventListener("error", () => resolve(), { once: true });
+        });
+      }));
+
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      printWindow.focus();
+      printWindow.print();
+    } catch (printError) {
+      cleanup();
+      console.error("Receipt printing error:", printError);
+      setError("Unable to print the receipt. Please check your printer settings and try again.");
+    }
   };
+
+  const printOrderReceipt = async () => {
+    if (!selectedOrder) return;
+    const qrSvg = document.querySelector(".print-order-qr svg")?.outerHTML ?? "";
+    await printReceipt(selectedOrder, orderItems, qrSvg);
+  };
+
+  const printCreatedOrderReceipt = async () => {
+    if (!creationNotice || printingCreatedReceipt) return;
+
+    setPrintingCreatedReceipt(true);
+    setError("");
+    try {
+      const qrSvg = document.querySelector(".creation-order-qr svg")?.outerHTML ?? "";
+      if (!qrSvg) throw new Error("The order QR code is not ready. Please try again.");
+
+      const { data, error: itemsError } = await supabase
+        .from("order_items")
+        .select("id, service_name, quantity, unit_price, subtotal")
+        .eq("order_id", creationNotice.orderId)
+        .order("created_at");
+
+      if (itemsError) throw itemsError;
+
+      const receiptItems: OrderItem[] = (data ?? []).map((item) => ({
+        ...item,
+        quantity: Number(item.quantity),
+        unit_price: Number(item.unit_price),
+        subtotal: Number(item.subtotal),
+      }));
+
+      await printReceipt({
+        order_number: creationNotice.orderNumber,
+        customer_name: creationNotice.customerName,
+        created_at: creationNotice.createdAt,
+        total_amount: creationNotice.totalAmount,
+      }, receiptItems, qrSvg);
+    } catch (err) {
+      console.error("New order receipt printing error:", err);
+      setError(getErrorMessage(err));
+    } finally {
+      setPrintingCreatedReceipt(false);
+    }
+  };
+
 
   // =====================================================
   // RENDER
@@ -931,16 +1087,24 @@ export default function LaundryOrders() {
             >
               <X size={18} />
             </button>
-            <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${error ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}>
-              {error ? <AlertCircle size={34} /> : <CheckCircle2 size={34} />}
-            </div>
-            <h3 className="mt-4 text-lg font-bold text-slate-900">
-              {error ? "Unable to Complete Action" : "Success!"}
-            </h3>
-            <p className="mt-2 break-words text-sm leading-6 text-slate-600">
-              {error || success}
-            </p>
-            <p className="mt-4 text-xs text-slate-400">This message will close automatically.</p>
+            {isAlreadyPickedUpNotice ? (
+              <p className="px-2 py-5 text-base font-semibold leading-7 text-slate-800">
+                {error}
+              </p>
+            ) : (
+              <>
+                <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${error ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}>
+                  {error ? <AlertCircle size={34} /> : <CheckCircle2 size={34} />}
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-slate-900">
+                  {error ? "Unable to Complete Action" : "Success!"}
+                </h3>
+                <p className="mt-2 break-words text-sm leading-6 text-slate-600">
+                  {error || success}
+                </p>
+                <p className="mt-4 text-xs text-slate-400">This message will close automatically.</p>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -985,7 +1149,7 @@ export default function LaundryOrders() {
                 </span>
               </div>
 
-              <div className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white p-4">
+              <div className="creation-order-qr flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white p-4">
                 <QRCodeSVG value={`ZATRO:ORDER:${creationNotice.orderId}`} size={156} level="H" includeMargin />
                 <p className="text-xs font-semibold text-slate-700">Order pickup QR code</p>
                 <p className="text-center text-[11px] text-slate-500">Attach this QR code to the customer's laundry tag.</p>
@@ -1017,12 +1181,24 @@ export default function LaundryOrders() {
               This confirmation will close automatically.
             </p>
 
-            <button
-              onClick={() => setCreationNotice(null)}
-              className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
-            >
-              Okay
-            </button>
+            <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setCreationNotice(null)}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => void printCreatedOrderReceipt()}
+                disabled={printingCreatedReceipt}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Printer size={17} />
+                {printingCreatedReceipt ? "Preparing Receipt..." : "Print Receipt"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1734,14 +1910,23 @@ export default function LaundryOrders() {
           <div className="print-order-card my-auto w-full max-w-xl rounded-2xl bg-white shadow-2xl">
 
             <div className="flex items-center justify-between border-b border-slate-100 p-5">
-              <div>
-                <p className="text-xs text-slate-500">
-                  Order Details
-                </p>
-
-                <h2 className="text-lg font-bold text-slate-900">
-                  {selectedOrder.order_number}
-                </h2>
+              <div className="flex min-w-0 items-center gap-3">
+                <img
+                  src="/zatro.jpeg"
+                  alt="ZATRO Laundry Shop"
+                  className="h-12 w-12 shrink-0 object-contain"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
+                    ZATRO Laundry Shop
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Order Details
+                  </p>
+                  <h2 className="truncate text-lg font-bold text-slate-900">
+                    {selectedOrder.order_number}
+                  </h2>
+                </div>
               </div>
 
               <button
@@ -1784,41 +1969,9 @@ export default function LaundryOrders() {
                   <p className="mt-1 text-sm font-semibold text-slate-800">
                     {format(
                       new Date(selectedOrder.created_at),
-                      "MMM dd, yyyy"
+                      "MMM dd, yyyy · hh:mm:ss a"
                     )}
                   </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-400">
-                    Status
-                  </p>
-
-                  <span
-                    className={`mt-1 inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                      statusStyles[selectedOrder.status]
-                    }`}
-                  >
-                    {readableStatus(selectedOrder.status)}
-                  </span>
-                </div>
-
-                <div className="col-span-2 rounded-xl bg-green-50 p-3">
-                  <p className="text-xs font-medium text-green-700">
-                    Actual Pickup Date &amp; Time
-                  </p>
-                  {selectedOrder.status === "completed" && selectedOrder.completed_at ? (
-                    <p className="mt-1 text-sm font-bold text-green-800">
-                      {format(
-                        new Date(selectedOrder.completed_at),
-                        "MMMM dd, yyyy · hh:mm:ss a"
-                      )}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-sm text-slate-500">
-                      The customer has not picked up this order yet.
-                    </p>
-                  )}
                 </div>
 
               </div>

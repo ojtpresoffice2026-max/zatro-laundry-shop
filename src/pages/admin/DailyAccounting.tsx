@@ -150,8 +150,8 @@ export default function DailyAccounting() {
   const [claims, setClaims] = useState<OrderWithCustomer[]>([]);
   const [payments, setPayments] = useState<PaymentWithDetails[]>([]);
   const [activeSection, setActiveSection] = useState<
-    "laundry" | "payments" | "claims"
-  >("laundry");
+    "summary" | "laundry" | "payments" | "claims"
+  >("summary");
   const [laundryPage, setLaundryPage] = useState(1);
   const [paymentsPage, setPaymentsPage] = useState(1);
   const [claimsPage, setClaimsPage] = useState(1);
@@ -699,6 +699,36 @@ export default function DailyAccounting() {
           </div>
         )}
 
+        {/* ACCOUNTING SECTION TABS */}
+        <div className="no-print mt-6 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2">
+          {[
+            { id: "summary", label: "Daily Accounting" },
+            { id: "laundry", label: "New Laundry" },
+            { id: "payments", label: "Payments Collected" },
+            { id: "claims", label: "Laundry Claims / Pickups" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() =>
+                setActiveSection(
+                  tab.id as "summary" | "laundry" | "payments" | "claims"
+                )
+              }
+              aria-current={activeSection === tab.id ? "page" : undefined}
+              className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
+                activeSection === tab.id
+                  ? "bg-[#142B4A] text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeSection === "summary" && (
+          <>
         {/* SUMMARY CARDS */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {cards.map((card) => {
@@ -805,29 +835,8 @@ export default function DailyAccounting() {
           </div>
         </div>
 
-        {/* ACCOUNTING SECTION TABS */}
-        <div className="no-print mt-6 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2">
-          {[
-            { id: "laundry", label: "New Laundry" },
-            { id: "payments", label: "Payments Collected" },
-            { id: "claims", label: "Laundry Claims / Pickups" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() =>
-                setActiveSection(tab.id as "laundry" | "payments" | "claims")
-              }
-              className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
-                activeSection === tab.id
-                  ? "bg-[#142B4A] text-white shadow-sm"
-                  : "text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+          </>
+        )}
 
         {/* NEW LAUNDRY TABLE */}
         {activeSection === "laundry" && (

@@ -1,7 +1,9 @@
+
 import {
   createContext,
   useCallback,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -35,80 +37,104 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshProfile = useCallback(async () => {
-    const {
-      data: { user: currentUser },
-      error,
-    } = await supabase.auth.getUser();
+  // Prevent outdated profile requests from overwriting newer sessions.
+  const requestId = useRef(0);
 
-    if (error || !currentUser) {
-      setUser(null);
-      setProfile(null);
-      return;
-    }
-
-    try {
-      const userProfile = await getUserProfile(currentUser.id);
-
-      setUser(currentUser);
-      setProfile(userProfile);
-    } catch {
-      await supabase.auth.signOut();
-      setUser(null);
-      setProfile(null);
-
-      throw new Error(
-        "Access denied. Only active administrators can use ZATRO."
-      );
-    }
+  const clearAuth = useCallback(() => {
+    requestId.current += 1;
+    setUser(null);
+    setProfile(null);
+    setLoading(false);
   }, []);
+
+  const loadUserProfile = useCallback(
+    async (currentUser: User) => {
+      const currentRequest = ++requestId.current;
+
+      setLoading(true);
+
+      try {
+        const userProfile = await getUserProfile(currentUser.id);
+
+        if (
+          userProfile.role !== "admin" ||
+          userProfile.is_active !== true
+        ) {
+          throw new Error(
+            "Access denied. Only active administrators can use ZATRO."
+          );
+        }
+
+        if (currentRequest !== requestId.current) return;
+
+        setUser(currentUser);
+        setProfile(userProfile);
+      } catch (error) {
+        if (currentRequest !== requestId.current) return;
+
+        console.error("Administrator verification failed:", error);
+
+        setUser(null);
+        setProfile(null);
+
+        await supabase.auth.signOut();
+      } finally {
+        if (currentRequest === requestId.current) {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
+
+  const refreshProfile = useCallback(async () => {
+    try {
+      const {
+        data: { user: currentUser },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (error || !currentUser) {
+        clearAuth();
+        return;
+      }
+
+      await loadUserProfile(currentUser);
+    } catch (error) {
+      console.error("Session verification failed:", error);
+      clearAuth();
+    }
+  }, [clearAuth, loadUserProfile]);
 
   useEffect(() => {
     let mounted = true;
 
-    const loadSession = async () => {
+    const initializeAuth = async () => {
       try {
+        // Validate the session with Supabase.
         const {
-          data: { session },
+          data: { user: currentUser },
           error,
-        } = await supabase.auth.getSession();
+        } = await supabase.auth.getUser();
 
-        if (error) throw error;
         if (!mounted) return;
 
-        if (session?.user) {
-          try {
-            const userProfile = await getUserProfile(session.user.id);
-
-            if (!mounted) return;
-
-            setUser(session.user);
-            setProfile(userProfile);
-          } catch {
-            await supabase.auth.signOut();
-
-            if (!mounted) return;
-
-            setUser(null);
-            setProfile(null);
-          }
-        } else {
-          setUser(null);
-          setProfile(null);
+        if (error || !currentUser) {
+          clearAuth();
+          return;
         }
+
+        await loadUserProfile(currentUser);
       } catch (error) {
-        console.error("Session loading error:", error);
+        console.error("Initial authentication error:", error);
 
         if (mounted) {
-          setUser(null);
-          setProfile(null);
+          clearAuth();
         }
-      } finally {
-        if (mounted) setLoading(false);
       }
     };
 
-    void loadSession();
+    void initializeAuth();
 
     const {
       data: { subscription },
@@ -116,30 +142,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (!mounted) return;
 
       if (event === "SIGNED_OUT" || !session?.user) {
-        setUser(null);
-        setProfile(null);
+        clearAuth();
         return;
       }
 
+      // Avoid duplicating the initial session check.
       if (event === "INITIAL_SESSION") return;
 
-      // Fetch the profile outside the Supabase auth callback.
+      // Run profile verification outside the auth callback.
       void Promise.resolve().then(async () => {
-        try {
-          const userProfile = await getUserProfile(session.user.id);
+        if (!mounted) return;
 
-          if (!mounted) return;
-
-          setUser(session.user);
-          setProfile(userProfile);
-        } catch {
-          await supabase.auth.signOut();
-
-          if (!mounted) return;
-
-          setUser(null);
-          setProfile(null);
-        }
+        await loadUserProfile(session.user);
       });
     });
 
@@ -147,17 +161,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [clearAuth, loadUserProfile]);
 
   const signIn = async (data: LoginData) => {
     await loginUser(data);
     await refreshProfile();
+
+    // Do not allow login to continue without a valid admin profile.
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
+
+    if (!currentUser) {
+      throw new Error("Login verification failed.");
+    }
+
+    const userProfile = await getUserProfile(currentUser.id);
+
+    if (
+      userProfile.role !== "admin" ||
+      userProfile.is_active !== true
+    ) {
+      await supabase.auth.signOut();
+      clearAuth();
+
+      throw new Error(
+        "Access denied. Only active administrators can use ZATRO."
+      );
+    }
   };
 
   const signOut = async () => {
-    await logoutUser();
-    setUser(null);
-    setProfile(null);
+    try {
+      await logoutUser();
+    } finally {
+      clearAuth();
+    }
   };
 
   const value: AuthContextType = {

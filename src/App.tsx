@@ -9,8 +9,9 @@ import {
 import { AuthProvider } from "./contexts/AuthContext";
 import { useAuth } from "./hooks/useAuth";
 
-import Login from "./pages/auth/Login";
+import ProtectedRoute from "./components/shared/ProtectedRoute";
 
+import Login from "./pages/auth/Login";
 import AdminLayout from "./layouts/AdminLayout";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -27,31 +28,12 @@ function LoadingScreen() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <div className="text-center">
         <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-
         <p className="mt-4 text-sm text-slate-500">
-          Loading Zatro Laundry Shop...
+          Verifying ZATRO administrator access...
         </p>
       </div>
     </div>
   );
-}
-
-function AdminOnlyRoute() {
-  const { user, profile, loading } = useAuth();
-
-  if (loading) {
-    return <LoadingScreen />;
-  }
-
-  if (!user || !profile) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (profile.role !== "admin") {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <AdminLayout />;
 }
 
 function AppRoutes() {
@@ -61,13 +43,19 @@ function AppRoutes() {
     return <LoadingScreen />;
   }
 
+  const isActiveAdmin =
+    !!user &&
+    !!profile &&
+    profile.role === "admin" &&
+    profile.is_active === true;
+
   return (
     <Routes>
       {/* Login */}
       <Route
         path="/login"
         element={
-          user && profile?.role === "admin" ? (
+          isActiveAdmin ? (
             <Navigate to="/admin/dashboard" replace />
           ) : (
             <Login />
@@ -75,70 +63,76 @@ function AppRoutes() {
         }
       />
 
-      {/* Admin Routes */}
-      <Route path="/admin" element={<AdminOnlyRoute />}>
-        <Route
-          index
-          element={<Navigate to="dashboard" replace />}
-        />
+      {/* Protected administrator routes */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route
+            index
+            element={<Navigate to="dashboard" replace />}
+          />
 
-        <Route
-          path="dashboard"
-          element={<AdminDashboard />}
-        />
+          <Route
+            path="dashboard"
+            element={<AdminDashboard />}
+          />
 
-        <Route
-          path="orders"
-          element={<LaundryOrders />}
-        />
+          <Route
+            path="orders"
+            element={<LaundryOrders />}
+          />
 
-        <Route
-          path="services"
-          element={<LaundryServices />}
-        />
+          <Route
+            path="services"
+            element={<LaundryServices />}
+          />
 
-        <Route
-          path="customers"
-          element={<CustomerManagement />}
-        />
+          <Route
+            path="customers"
+            element={<CustomerManagement />}
+          />
 
-        <Route
-          path="daily-accounting"
-          element={<DailyAccounting />}
-        />
+          <Route
+            path="daily-accounting"
+            element={<DailyAccounting />}
+          />
 
-        <Route
-          path="inventory"
-          element={<InventoryManagement />}
-        />
+          <Route
+            path="inventory"
+            element={<InventoryManagement />}
+          />
 
-        <Route
-          path="reports"
-          element={<ReportsManagement />}
-        />
+          <Route
+            path="reports"
+            element={<ReportsManagement />}
+          />
 
-        <Route
-          path="admin-management"
-          element={<AdminManagement />}
-        />
+          <Route
+            path="admin-management"
+            element={<AdminManagement />}
+          />
+        </Route>
       </Route>
 
-      {/* Default Route */}
+      {/* Home */}
       <Route
         path="/"
         element={
-          user && profile?.role === "admin" ? (
-            <Navigate to="/admin/dashboard" replace />
-          ) : (
-            <Navigate to="/login" replace />
-          )
+          <Navigate
+            to={isActiveAdmin ? "/admin/dashboard" : "/login"}
+            replace
+          />
         }
       />
 
-      {/* Invalid Routes */}
+      {/* Unknown routes */}
       <Route
         path="*"
-        element={<Navigate to="/" replace />}
+        element={
+          <Navigate
+            to={isActiveAdmin ? "/admin/dashboard" : "/login"}
+            replace
+          />
+        }
       />
     </Routes>
   );
