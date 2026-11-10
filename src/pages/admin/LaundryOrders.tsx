@@ -17,6 +17,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  History,
+  Clock3,
 } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { QRCodeSVG } from "qrcode.react";
@@ -66,6 +68,20 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   subtotal: number;
+}
+
+interface OrderHistoryEvent {
+  id: string;
+  order_id: string;
+  status: string;
+  remarks: string | null;
+  updated_by: string | null;
+  created_at: string;
+}
+
+interface OrderHistoryActor {
+  id: string;
+  full_name: string | null;
 }
 
 interface NewOrderItem {
@@ -178,6 +194,9 @@ export default function LaundryOrders() {
   // Order details
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [orderHistory, setOrderHistory] = useState<OrderHistoryEvent[]>([]);
+  const [historyActors, setHistoryActors] = useState<Record<string, string>>({});
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Create order form
   const [customerName, setCustomerName] = useState("");
@@ -560,33 +579,73 @@ export default function LaundryOrders() {
   const viewOrder = async (order: Order) => {
     setSelectedOrder(order);
     setOrderItems([]);
+    setOrderHistory([]);
+    setHistoryActors({});
     setLoadingDetails(true);
+    setLoadingHistory(true);
     setError("");
 
     try {
-      const { data, error: itemsError } = await supabase
-        .from("order_items")
-        .select(
-          "id, service_name, quantity, unit_price, subtotal"
-        )
-        .eq("order_id", order.id)
-        .order("created_at");
+      const [itemsResult, historyResult] = await Promise.all([
+        supabase
+          .from("order_items")
+          .select("id, service_name, quantity, unit_price, subtotal")
+          .eq("order_id", order.id)
+          .order("created_at"),
 
-      if (itemsError) throw itemsError;
+        supabase
+          .from("order_status_history")
+          .select("id, order_id, status, remarks, updated_by, created_at")
+          .eq("order_id", order.id)
+          .order("created_at", { ascending: true }),
+      ]);
+
+      if (itemsResult.error) throw itemsResult.error;
+      if (historyResult.error) throw historyResult.error;
 
       setOrderItems(
-        (data ?? []).map((item) => ({
+        (itemsResult.data ?? []).map((item) => ({
           ...item,
           quantity: Number(item.quantity),
           unit_price: Number(item.unit_price),
           subtotal: Number(item.subtotal),
         }))
       );
+
+      const history = (historyResult.data ?? []) as OrderHistoryEvent[];
+      setOrderHistory(history);
+
+      const actorIds = Array.from(
+        new Set(
+          history
+            .map((event) => event.updated_by)
+            .filter((id): id is string => Boolean(id))
+        )
+      );
+
+      if (actorIds.length > 0) {
+        const { data: actors, error: actorsError } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", actorIds);
+
+        if (actorsError) throw actorsError;
+
+        setHistoryActors(
+          Object.fromEntries(
+            ((actors ?? []) as OrderHistoryActor[]).map((actor) => [
+              actor.id,
+              actor.full_name || "Administrator",
+            ])
+          )
+        );
+      }
     } catch (err) {
-      console.error("Order details error:", err);
+      console.error("Order details or tracking history error:", err);
       setError(getErrorMessage(err));
     } finally {
       setLoadingDetails(false);
+      setLoadingHistory(false);
     }
   };
 
@@ -2017,6 +2076,118 @@ export default function LaundryOrders() {
                   </div>
                 )}
               </div>
+
+              {/* ORDER TRACKING TIMELINE */}
+
+              <section className="border-t border-slate-100 pt-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <History size={18} className="text-blue-600" />
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">
+                      Order Tracking Timeline
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Recorded order status changes and timestamps
+                    </p>
+                  </div>
+                </div>
+
+                {loadingHistory ? (
+                  <div className="flex items-center justify-center gap-2 rounded-xl bg-slate-50 py-6 text-sm text-slate-500">
+                    <Clock3 size={16} className="animate-pulse" />
+                    Loading tracking history...
+                  </div>
+                ) : (
+                  <div className="relative ml-2 space-y-0">
+                    <div className="relative flex gap-3 pb-5">
+                      <div className="relative flex w-5 shrink-0 justify-center">
+                        <span className="absolute top-5 h-full w-px bg-slate-200" />
+                        <span className="z-10 mt-1 h-3 w-3 rounded-full border-2 border-blue-600 bg-white" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-800">
+                          Order Received
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {format(new Date(selectedOrder.created_at), "MMM dd, yyyy · hh:mm:ss a")}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Laundry order created in the system
+                        </p>
+                      </div>
+                    </div>
+
+                    {orderHistory.map((event, index) => {
+                      const isLatest = index === orderHistory.length - 1;
+                      const isCompleted = event.status === "completed";
+
+                      return (
+                        <div key={event.id} className="relative flex gap-3 pb-5 last:pb-0">
+                          <div className="relative flex w-5 shrink-0 justify-center">
+                            {index !== orderHistory.length - 1 && (
+                              <span className="absolute top-5 h-full w-px bg-slate-200" />
+                            )}
+                            <span
+                              className={`z-10 mt-1 h-3 w-3 rounded-full border-2 ${
+                                isCompleted
+                                  ? "border-green-600 bg-green-500"
+                                  : "border-blue-500 bg-white"
+                              }`}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-slate-800">
+                                {readableStatus(event.status)}
+                              </p>
+                              {isLatest && (
+                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                                  Latest
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {format(new Date(event.created_at), "MMM dd, yyyy · hh:mm:ss a")}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Updated by: {event.updated_by
+                                ? historyActors[event.updated_by] || "Administrator"
+                                : "System / unavailable"}
+                            </p>
+                            {event.remarks && (
+                              <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs leading-5 text-slate-600">
+                                {event.remarks}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {orderHistory.length === 0 && (
+                      <p className="ml-8 rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-700">
+                        No status history records were found for this order. The order creation date above is shown as the first known milestone.
+                      </p>
+                    )}
+
+                    {selectedOrder.status === "in_shop" && (
+                      <div className="relative flex gap-3 pt-4">
+                        <div className="flex w-5 shrink-0 justify-center">
+                          <span className="mt-1 h-3 w-3 rounded-full border-2 border-amber-500 bg-white" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-amber-700">
+                            Currently In Shop
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Awaiting completion and customer pickup
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
 
               {/* INSTRUCTIONS */}
 

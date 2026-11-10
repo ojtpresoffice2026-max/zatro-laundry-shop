@@ -5,11 +5,9 @@ import {
   Eye,
   EyeOff,
   LoaderCircle,
-  ShieldCheck,
   Mail,
   LockKeyhole,
   ArrowRight,
-  Sparkles,
 } from "lucide-react";
 
 import { useAuth } from "../../hooks/useAuth";
@@ -49,213 +47,246 @@ export default function Login() {
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#061b50] px-4 py-10">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#102c55] px-4 py-10">
 
-      {/* BACKGROUND IMAGE */}
+      {/* BLURRED BACKGROUND */}
       <div className="absolute inset-0 overflow-hidden">
-
-        {/* Blurred ZATRO logo */}
         <img
           src="/zatro.jpeg"
           alt=""
           aria-hidden="true"
-          className="absolute left-1/2 top-1/2 h-[650px] w-[650px] -translate-x-1/2 -translate-y-1/2 scale-150 object-contain opacity-[0.12] blur-[12px] sm:h-[850px] sm:w-[850px]"
+          className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
         />
 
-        {/* Blue gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#061b50]/90 via-[#103c9a]/85 to-[#0758d5]/90" />
+        {/* Dark blue overlay */}
+        <div className="absolute inset-0 bg-[#102c55]/65" />
 
-        {/* Decorative circles */}
-        <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full border-[70px] border-white/[0.04]" />
+        {/* Soft blue lighting */}
+        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-blue-400/20 blur-[100px]" />
 
-        <div className="absolute -bottom-48 -right-40 h-[600px] w-[600px] rounded-full border-[90px] border-sky-300/[0.06]" />
-
-        <div className="absolute right-[12%] top-[12%] h-72 w-72 rounded-full bg-blue-400/10 blur-[100px]" />
-
-        <div className="absolute bottom-[10%] left-[10%] h-80 w-80 rounded-full bg-cyan-400/10 blur-[100px]" />
+        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-cyan-400/20 blur-[100px]" />
       </div>
 
-      {/* LOGIN CARD */}
-      <div className="relative z-10 w-full max-w-[440px]">
+      {/* MAIN LOGIN CARD */}
+      <div className="relative z-10 grid w-full max-w-[1000px] overflow-hidden rounded-xl bg-white shadow-[0_15px_50px_rgba(0,0,0,0.25)] md:min-h-[590px] md:grid-cols-2">
 
-        {/* Glow behind card */}
-        <div className="absolute -inset-3 rounded-[35px] bg-cyan-400/20 blur-2xl" />
+        {/* LEFT BRANDING PANEL */}
+        <section className="relative flex flex-col items-center justify-center overflow-hidden bg-[#102c55] px-8 py-12 text-center text-white md:px-12">
 
-        <div className="relative overflow-hidden rounded-[30px] border border-white/30 bg-white/[0.13] p-7 shadow-[0_25px_100px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:p-10">
-
-          {/* Decorative top glow */}
-          <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-transparent via-cyan-300 to-transparent" />
-
-          {/* Decorative bottom waves */}
-          <div className="pointer-events-none absolute -bottom-24 -left-16 h-44 w-[140%] rotate-[-5deg] rounded-[50%] bg-blue-400/10 blur-xl" />
-
-          {/* LOGO AND BRANDING */}
-          <div className="relative z-10 mb-8 text-center">
-
-            <div className="relative mx-auto mb-5 flex h-32 w-32 items-center justify-center">
-
-              {/* Logo glow */}
-              <div className="absolute inset-0 rounded-[35px] bg-cyan-300/30 blur-2xl" />
-
-              {/* Logo container */}
-              <div className="relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-[28px] border border-white/70 bg-white p-2 shadow-[0_10px_35px_rgba(0,0,0,0.25)]">
-                <img
-                  src="/zatro.jpeg"
-                  alt="ZATRO Laundry Shop Logo"
-                  className="h-full w-full rounded-[20px] object-contain"
-                />
-              </div>
-
-              <Sparkles
-                size={24}
-                className="absolute -right-1 -top-1 text-cyan-300"
+          {/* WATER WAVES */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 overflow-hidden">
+            <svg
+              viewBox="0 0 800 200"
+              preserveAspectRatio="none"
+              className="absolute bottom-0 h-full w-full"
+              aria-hidden="true"
+            >
+              <path
+                d="M0 75 C150 25 250 140 400 105 S650 20 800 80 L800 200 L0 200Z"
+                fill="#0878bd"
+                opacity="0.55"
               />
+
+              <path
+                d="M0 112 C160 65 260 160 420 125 S650 65 800 105 L800 200 L0 200Z"
+                fill="#159bd6"
+                opacity="0.65"
+              />
+
+              <path
+                d="M0 150 C180 105 290 185 450 150 S680 100 800 135 L800 200 L0 200Z"
+                fill="#55bce9"
+                opacity="0.48"
+              />
+            </svg>
+
+            {/* SOAP BUBBLES */}
+            <div className="absolute bottom-16 left-[12%] h-9 w-9 rounded-full border-2 border-sky-200/80 bg-sky-200/10 shadow-[inset_-5px_-5px_8px_rgba(0,120,200,0.4)]">
+              <div className="absolute left-2 top-1 h-2 w-3 rounded-full bg-white/70 blur-[1px]" />
             </div>
 
-            <h1 className="text-4xl font-black tracking-[0.18em] text-white drop-shadow-lg">
+            <div className="absolute bottom-8 left-[22%] h-6 w-6 rounded-full border border-sky-100/80 bg-sky-100/20">
+              <div className="absolute left-1 top-1 h-1.5 w-2 rounded-full bg-white/70" />
+            </div>
+
+            <div className="absolute bottom-12 right-[15%] h-10 w-10 rounded-full border-2 border-sky-100/80 bg-sky-100/10">
+              <div className="absolute left-2 top-1.5 h-2 w-3 rounded-full bg-white/70" />
+            </div>
+
+            <div className="absolute bottom-7 right-[27%] h-5 w-5 rounded-full border border-white/70 bg-white/10" />
+          </div>
+
+          {/* LOGO */}
+          <div className="relative z-10 mb-7 flex h-32 w-32 items-center justify-center overflow-hidden rounded-xl bg-white p-3 shadow-lg">
+            <img
+              src="/zatro.jpeg"
+              alt="ZATRO Laundry Shop Logo"
+              className="h-full w-full object-contain"
+            />
+          </div>
+
+          {/* BRAND NAME */}
+          <div className="relative z-10">
+            <h1 className="text-4xl font-extrabold tracking-[0.12em]">
               ZATRO
             </h1>
 
-            <p className="mt-1 text-xs font-bold uppercase tracking-[0.4em] text-cyan-200">
+            <p className="mt-2 text-sm font-semibold tracking-[0.35em] text-sky-300">
+              LAUNDRY SHOP
+            </p>
+
+            <div className="mx-auto my-7 h-1 w-20 rounded-full bg-sky-400" />
+
+            <h2 className="text-xl font-bold leading-snug">
               Laundry Shop
+              <br />
+              Management System
+            </h2>
+
+            <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-blue-100/90">
+              Manage laundry orders, customers, services, inventory, and
+              daily business operations in one place.
             </p>
-
-            <div className="mx-auto mt-4 h-1 w-16 rounded-full bg-gradient-to-r from-sky-300 to-cyan-400" />
-
-            <p className="mt-4 text-sm text-blue-100">
-              Laundry Shop Management System
-            </p>
-
-            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-cyan-200/30 bg-blue-400/20 px-5 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md">
-              <ShieldCheck size={16} className="text-cyan-300" />
-              Administrator Access
-            </div>
           </div>
+        </section>
 
-          {/* ERROR MESSAGE */}
-          {error && (
-            <div
-              role="alert"
-              className="relative z-10 mb-5 rounded-xl border border-red-300/30 bg-red-500/15 p-4 text-sm text-red-100 backdrop-blur-md"
-            >
-              {error}
+        {/* RIGHT LOGIN PANEL */}
+        <section className="flex flex-col justify-center px-7 py-12 sm:px-12 lg:px-16">
+          <div className="mx-auto w-full max-w-[370px]">
+
+            {/* HEADING */}
+            <div className="mb-9">
+              <p className="text-sm font-medium text-[#64748b]">
+                Welcome back
+              </p>
+
+              <h2 className="mt-2 text-2xl font-bold text-[#172b4d]">
+                Administrator Login
+              </h2>
+
+              <p className="mt-2 text-sm text-[#64748b]">
+                Sign in to access your management dashboard.
+              </p>
             </div>
-          )}
 
-          {/* LOGIN FORM */}
-          <form onSubmit={handleSubmit} className="relative z-10 space-y-5">
-
-            {/* EMAIL */}
-            <div>
-              <label
-                htmlFor="email"
-                className="mb-2 block text-sm font-semibold text-white"
+            {/* ERROR MESSAGE */}
+            {error && (
+              <div
+                role="alert"
+                className="mb-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
               >
-                Administrator Email
-              </label>
-
-              <div className="relative">
-                <Mail
-                  size={19}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-200"
-                />
-
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter administrator email"
-                  disabled={loading}
-                  className="w-full rounded-xl border border-white/30 bg-white/10 py-3.5 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-blue-100/60 hover:border-cyan-200/60 focus:border-cyan-300 focus:bg-white/15 focus:ring-4 focus:ring-cyan-300/10 disabled:opacity-60"
-                />
+                {error}
               </div>
-            </div>
+            )}
 
-            {/* PASSWORD */}
-            <div>
-              <label
-                htmlFor="password"
-                className="mb-2 block text-sm font-semibold text-white"
-              >
-                Password
-              </label>
+            {/* LOGIN FORM */}
+            <form onSubmit={handleSubmit} className="space-y-5">
 
-              <div className="relative">
-                <LockKeyhole
-                  size={19}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-200"
-                />
-
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  disabled={loading}
-                  className="w-full rounded-xl border border-white/30 bg-white/10 py-3.5 pl-12 pr-12 text-sm text-white outline-none transition placeholder:text-blue-100/60 hover:border-cyan-200/60 focus:border-cyan-300 focus:bg-white/15 focus:ring-4 focus:ring-cyan-300/10 disabled:opacity-60"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-200 transition hover:text-white disabled:opacity-50"
+              {/* EMAIL */}
+              <div>
+                <label
+                  htmlFor="email"
+                  className="mb-2 block text-sm font-semibold text-[#334155]"
                 >
-                  {showPassword ? (
-                    <EyeOff size={19} />
-                  ) : (
-                    <Eye size={19} />
-                  )}
-                </button>
-              </div>
-            </div>
+                  Email Address
+                </label>
 
-            {/* SIGN IN BUTTON */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="group flex w-full items-center justify-center gap-3 rounded-xl border border-cyan-300/50 bg-gradient-to-r from-cyan-400 via-blue-500 to-blue-600 py-4 font-bold text-white shadow-[0_8px_30px_rgba(0,153,255,0.35)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_40px_rgba(0,200,255,0.45)] focus:outline-none focus:ring-4 focus:ring-cyan-300/30 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-            >
-              {loading ? (
-                <>
-                  <LoaderCircle size={20} className="animate-spin" />
-                  Verifying administrator...
-                </>
-              ) : (
-                <>
-                  <span>Administrator Sign In</span>
-                  <ArrowRight
-                    size={20}
-                    className="transition-transform group-hover:translate-x-1"
+                <div className="relative">
+                  <Mail
+                    size={18}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8]"
                   />
-                </>
-              )}
-            </button>
-          </form>
 
-          {/* FOOTER */}
-          <div className="relative z-10 mt-8 border-t border-white/20 pt-6 text-center">
-            <div className="mb-3 flex items-center justify-center gap-2 text-xs text-blue-100/80">
-              <LockKeyhole size={13} />
-              Authorized administrators only
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    autoComplete="username"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    disabled={loading}
+                    className="h-12 w-full rounded-md border border-[#dbe1ea] bg-white pl-11 pr-4 text-sm text-[#172b4d] outline-none transition focus:border-[#244d80] focus:ring-2 focus:ring-[#244d80]/10 disabled:bg-gray-100"
+                  />
+                </div>
+              </div>
+
+              {/* PASSWORD */}
+              <div>
+                <label
+                  htmlFor="password"
+                  className="mb-2 block text-sm font-semibold text-[#334155]"
+                >
+                  Password
+                </label>
+
+                <div className="relative">
+                  <LockKeyhole
+                    size={18}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8]"
+                  />
+
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    disabled={loading}
+                    className="h-12 w-full rounded-md border border-[#dbe1ea] bg-white pl-11 pr-12 text-sm text-[#172b4d] outline-none transition focus:border-[#244d80] focus:ring-2 focus:ring-[#244d80]/10 disabled:bg-gray-100"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#244d80]"
+                  >
+                    {showPassword ? (
+                      <EyeOff size={18} />
+                    ) : (
+                      <Eye size={18} />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* SIGN IN BUTTON */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-[#173b69] px-4 text-sm font-semibold text-white transition hover:bg-[#102c55] focus:outline-none focus:ring-2 focus:ring-[#173b69]/30 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? (
+                  <>
+                    <LoaderCircle size={18} className="animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight size={18} />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* FOOTER */}
+            <div className="mt-10 border-t border-[#e8edf3] pt-5 text-center">
+              <div className="flex items-center justify-center gap-2 text-xs text-[#64748b]">
+                <LockKeyhole size={13} />
+                Restricted to authorized administrators
+              </div>
+
+              <p className="mt-3 text-xs text-[#94a3b8]">
+                © 2026 ZATRO Laundry Shop. All rights reserved.
+              </p>
             </div>
-
-            <p className="text-xs text-blue-100/70">
-              © 2026 ZATRO Laundry Shop. All rights reserved.
-            </p>
           </div>
-        </div>
-
-        <p className="relative z-10 mt-6 text-center text-xs tracking-wide text-blue-100/60">
-          POWERED BY ZATRO LAUNDRY SHOP MANAGEMENT SYSTEM
-        </p>
+        </section>
       </div>
     </main>
   );

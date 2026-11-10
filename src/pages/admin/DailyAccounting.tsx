@@ -34,6 +34,16 @@ type Payment = {
   created_at: string;
 };
 
+type Expense = {
+  id: string;
+  expense_date: string;
+  category: string;
+  description: string;
+  amount: number;
+  status: "active" | "voided";
+  created_at: string;
+};
+
 type CustomerProfile = {
   id: string;
   full_name: string;
@@ -149,6 +159,7 @@ export default function DailyAccounting() {
   const [orders, setOrders] = useState<OrderWithCustomer[]>([]);
   const [claims, setClaims] = useState<OrderWithCustomer[]>([]);
   const [payments, setPayments] = useState<PaymentWithDetails[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [activeSection, setActiveSection] = useState<
     "summary" | "laundry" | "payments" | "claims"
   >("summary");
@@ -174,6 +185,17 @@ export default function DailyAccounting() {
 
     try {
       const { start, end } = getDayRange(selectedDate);
+
+      // Load active expenses recorded on the selected date.
+      const { data: expensesData, error: expensesError } = await supabase
+        .from("expenses")
+        .select("id, expense_date, category, description, amount, status, created_at")
+        .eq("expense_date", selectedDate)
+        .eq("status", "active")
+        .order("created_at", { ascending: false });
+
+      if (expensesError) throw expensesError;
+      setExpenses((expensesData || []) as Expense[]);
 
       // 1. Orders created on the selected date.
       const { data: salesData, error: salesError } = await supabase
@@ -404,6 +426,11 @@ export default function DailyAccounting() {
         { event: "*", schema: "public", table: "payments" },
         () => void loadAccounting()
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "expenses" },
+        () => void loadAccounting()
+      )
       .subscribe();
 
     return () => {
@@ -450,6 +477,14 @@ export default function DailyAccounting() {
     [payments]
   );
 
+  // Expenses are separate from payment collections.
+  const totalExpenses = useMemo(
+    () => expenses.reduce((total, expense) => total + Number(expense.amount || 0), 0),
+    [expenses]
+  );
+  // Cash on Hand remains unchanged; net cash is shown separately.
+  const netCashAfterExpenses = cashOnHand - totalExpenses;
+
   // TOTAL VALUE OF CLAIMED ORDERS:
   const claimsTotal = useMemo(
     () =>
@@ -483,6 +518,9 @@ export default function DailyAccounting() {
       ["Paid Sales", paidSales.toFixed(2)],
       ["Unpaid Sales", unpaidSales.toFixed(2)],
       ["Cash on Hand", cashOnHand.toFixed(2)],
+      ["Total Expenses", totalExpenses.toFixed(2)],
+      ["Net Cash After Expenses", netCashAfterExpenses.toFixed(2)],
+      ["Expense Records", expenses.length],
       ["Claims", claims.length],
       ["Claimed Order Value", claimsTotal.toFixed(2)],
       [],
@@ -500,6 +538,13 @@ export default function DailyAccounting() {
         payment.payment_method,
         Number(payment.amount).toFixed(2),
         payment.paid_at || "",
+      ]),
+      [],
+      ["EXPENSES"],
+      ["Category", "Description", "Amount", "Expense Date", "Status"],
+      ...expenses.map((expense) => [
+        expense.category, expense.description, Number(expense.amount).toFixed(2),
+        expense.expense_date, expense.status,
       ]),
       [],
       ["LAUNDRY CLAIMS"],
@@ -582,6 +627,20 @@ export default function DailyAccounting() {
       icon: Banknote,
       color: "violet",
     },
+    {
+      title: "Total Expenses",
+      value: formatCurrency(totalExpenses),
+      subtitle: `${expenses.length} active expense records`,
+      icon: Wallet,
+      color: "rose",
+    },
+    {
+      title: "Net Cash After Expenses",
+      value: formatCurrency(netCashAfterExpenses),
+      subtitle: "Cash collected minus active expenses",
+      icon: Banknote,
+      color: "teal",
+    },
   ];
 
   const colorClasses: Record<string, string> = {
@@ -589,6 +648,8 @@ export default function DailyAccounting() {
     emerald: "bg-emerald-50 text-emerald-600",
     amber: "bg-amber-50 text-amber-600",
     violet: "bg-violet-50 text-violet-600",
+    rose: "bg-rose-50 text-rose-600",
+    teal: "bg-teal-50 text-teal-600",
   };
 
   return (
@@ -730,7 +791,7 @@ export default function DailyAccounting() {
         {activeSection === "summary" && (
           <>
         {/* SUMMARY CARDS */}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map((card) => {
             const Icon = card.icon;
 
